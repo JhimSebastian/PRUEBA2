@@ -43,7 +43,7 @@
         video, canvas {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain; /* 🟢 Mantiene proporciones sin deformar */
             position: absolute;
             top: 0;
             left: 0;
@@ -87,23 +87,26 @@
 
         async function iniciarCamara() {
             try {
-                let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                let stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
+                video.onloadedmetadata = () => ajustarCanvas();
             } catch (error) {
                 console.error("Error accediendo a la cámara:", error);
             }
         }
 
+        function ajustarCanvas() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        }
+
         function capturarYEnviar() {
             if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
-            const canvasTemp = document.createElement('canvas');
-            const ctxTemp = canvasTemp.getContext('2d');
-            canvasTemp.width = video.videoWidth;
-            canvasTemp.height = video.videoHeight;
+            ajustarCanvas(); // 🟢 Ajusta el canvas antes de capturar
 
-            ctxTemp.drawImage(video, 0, 0, canvasTemp.width, canvasTemp.height);
-            const imageData = canvasTemp.toDataURL('image/jpeg');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/jpeg');
 
             fetch('/deteccion', {
                 method: 'POST',
@@ -123,10 +126,10 @@
                     ctx.font = '16px Arial';
 
                     const nombresClases = {
-                    0: "Llavero",
-                    1: "Chompa",
-                    2: "Guantes",
-                    3: "Gorro"
+                        0: "Llavero",
+                        1: "Chompa",
+                        2: "Guantes",
+                        3: "Gorro"
                     };
                     ctx.fillText(nombresClases[det.clase] || `Clase ${det.clase}`, det.x1, det.y1 - 5);
 
@@ -138,7 +141,7 @@
         }
 
         iniciarCamara();
-        setInterval(capturarYEnviar, 200); // 🔥 Velocidad de captura 
+        setInterval(capturarYEnviar, 200); // 🔥 Velocidad de captura
     </script>
 </body>
 </html>
