@@ -2,25 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Detección de Objetos</title>
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+    <title>Detección en Tiempo Real</title>
     <style>
-        /* Ajustar el tamaño para celulares */
         body, html {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: black; /* Mejor contraste */
+            background-color: black;
         }
 
-        /* Contenedor principal */
         .container {
-            width: 360px; 
+            width: 360px;
             height: 640px;
             position: relative;
             background: url("{{ url_for('static', filename='img_movil/fondo3.jpg') }}") no-repeat center center;
@@ -33,23 +30,25 @@
             overflow: hidden;
         }
 
-        /* 📷 Contenedor de la cámara */
         .video-container {
-            width: 280px; /* 🔹 Reducido para mejor ajuste */
-            height: 210px; /* 🔹 Mantener proporción */
+            width: 280px;
+            height: 210px;
             border: 3px solid white;
-            margin-top: 75px; /* 🔹 Posiciona más arriba */
+            margin-top: 75px;
             border-radius: 10px;
             overflow: hidden;
+            position: relative;
         }
 
-        .video-container img {
+        video, canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
-        /* 📌 Contenedor de las imágenes del producto */
         .info-container {
             display: flex;
             justify-content: space-around;
@@ -59,7 +58,7 @@
         }
 
         .info-container img {
-            width: 120px; /* 🔹 Más pequeñas */
+            width: 120px;
             height: auto;
             border: 2px solid white;
             border-radius: 8px;
@@ -70,40 +69,76 @@
     <div class="container">
         <!-- Cámara -->
         <div class="video-container">
-            <img src="{{ url_for('video_feed') }}" alt="Cámara en vivo">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
         </div>
 
-        <!-- Imágenes del producto detectado -->
+        <!-- Imágenes detectadas -->
         <div class="info-container">
-            <div>
-                <img id="producto" src="{{ url_for('static', filename=producto) if producto else '' }}" alt="Producto Detectado">
-            </div>
-            <div>
-                <img id="info" src="{{ url_for('static', filename=info) if info else '' }}" alt="Información del Producto">
-            </div>
+            <img id="producto" src="" alt="Producto Detectado">
+            <img id="info" src="" alt="Información del Producto">
         </div>
     </div>
 
     <script>
-        function actualizarImagenes(producto, info) {
-            document.getElementById('producto').src = producto ? '/static/' + producto : '';
-            document.getElementById('info').src = info ? '/static/' + info : '';
-        }
-    
-        function obtenerDeteccion() {
-            fetch('/deteccion')
-                .then(response => response.json())
-                .then(data => {
-                    console.log("Datos recibidos:", data); 
-                    if (data.producto && data.info) {
-                        actualizarImagenes(data.producto, data.info);
-                    }
-                })
-                .catch(error => console.error("Error en detección:", error));
-        }
-    
-        setInterval(obtenerDeteccion, 1000);
-    </script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
+        async function iniciarCamara() {
+            try {
+                let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (error) {
+                console.error("Error accediendo a la cámara:", error);
+            }
+        }
+
+        function capturarYEnviar() {
+            if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+            const canvasTemp = document.createElement('canvas');
+            const ctxTemp = canvasTemp.getContext('2d');
+            canvasTemp.width = video.videoWidth;
+            canvasTemp.height = video.videoHeight;
+
+            ctxTemp.drawImage(video, 0, 0, canvasTemp.width, canvasTemp.height);
+            const imageData = canvasTemp.toDataURL('image/jpeg');
+
+            fetch('/deteccion', {
+                method: 'POST',
+                body: JSON.stringify({ image: imageData }),
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                data.detecciones.forEach(det => {
+                    ctx.strokeStyle = 'lime';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(det.x1, det.y1, det.x2 - det.x1, det.y2 - det.y1);
+                    ctx.fillStyle = 'red';
+                    ctx.font = '16px Arial';
+
+                    const nombresClases = {
+                    0: "Llavero",
+                    1: "Chompa",
+                    2: "Guantes",
+                    3: "Gorro"
+                    };
+                    ctx.fillText(nombresClases[det.clase] || `Clase ${det.clase}`, det.x1, det.y1 - 5);
+
+                    document.getElementById('producto').src = det.producto ? `/static/${det.producto}` : '';
+                    document.getElementById('info').src = det.info ? `/static/${det.info}` : '';
+                });
+            })
+            .catch(error => console.error("Error en detección:", error));
+        }
+
+        iniciarCamara();
+        setInterval(capturarYEnviar, 200); // 🔥 Velocidad de captura 
+    </script>
 </body>
 </html>
