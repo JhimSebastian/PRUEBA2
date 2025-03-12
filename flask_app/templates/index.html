@@ -43,7 +43,7 @@
         video, canvas {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* 🟢 Mantiene proporciones sin deformar */
+            object-fit: contain;
             position: absolute;
             top: 0;
             left: 0;
@@ -67,13 +67,11 @@
 </head>
 <body>
     <div class="container">
-        <!-- Cámara -->
         <div class="video-container">
             <video id="video" autoplay playsinline></video>
             <canvas id="canvas"></canvas>
         </div>
 
-        <!-- Imágenes detectadas -->
         <div class="info-container">
             <img id="producto" src="" alt="Producto Detectado">
             <img id="info" src="" alt="Información del Producto">
@@ -103,7 +101,7 @@
         function capturarYEnviar() {
             if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
-            ajustarCanvas(); // 🟢 Ajusta el canvas antes de capturar
+            ajustarCanvas();
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = canvas.toDataURL('image/jpeg');
@@ -141,7 +139,7 @@
         }
 
         iniciarCamara();
-        setInterval(capturarYEnviar, 200); // 🔥 Velocidad de captura
+        setInterval(capturarYEnviar, 200);
     </script>
 </body>
 </html>

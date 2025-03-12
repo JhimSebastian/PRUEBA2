@@ -16,10 +16,10 @@ ruta_modelo = os.path.join(directorio_base, "models_movil", "best110.pt")
 if not os.path.exists(ruta_modelo):
     raise FileNotFoundError(f"El modelo no se encontró en: {ruta_modelo}")
 
-# Cargar el modelo YOLO en CPU para ahorrar memoria
-model = YOLO(ruta_modelo).to("cpu")
+# Cargar el modelo YOLO
+model = YOLO(ruta_modelo)
 
-# Diccionario de imágenes asociadas a cada clase
+# Rutas de imágenes
 imagenes = {
     0: {"producto": "img_movil/llavero.png", "info": "img_movil/llavero_inf.png"},
     1: {"producto": "img_movil/chompa.png", "info": "img_movil/chompa_inf.png"},
@@ -34,29 +34,18 @@ def index():
 @app.route('/deteccion', methods=['POST'])
 def deteccion():
     try:
-        # Obtener la imagen en base64
         data = request.json
-        image_data = data['image'].split(",")[1]
+        image_data = data['image'].split(",")[1]  # Remover encabezado de base64
         image_bytes = base64.b64decode(image_data)
-        
-        # Decodificar la imagen en formato OpenCV
         image_np = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
 
-        # Redimensionar imagen para mejorar velocidad (ajusta si es necesario)
-        frame = cv2.resize(frame, (640, 640))
-
-        # Opcional: convertir a escala de grises para reducir carga de procesamiento
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Realizar la detección sin "stream=True" y sin imprimir logs
-        results = model(frame, verbose=False)
-
-        # Procesar detecciones
+        results = model(frame, stream=True, verbose=False)
         detecciones = []
+
         for res in results:
             for caja in res.boxes:
-                x1, y1, x2, y2 = map(int, caja.xyxy[0])
+                x1, y1, x2, y2 = [int(val) for val in caja.xyxy[0]]
                 clase = int(caja.cls[0])
 
                 detecciones.append({
@@ -71,4 +60,4 @@ def deteccion():
         return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)  # Desactiva debug en producción
+    app.run(host='0.0.0.0', port=5000, debug=True)
