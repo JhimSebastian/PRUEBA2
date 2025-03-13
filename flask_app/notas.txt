@@ -1,0 +1,6 @@
+
+- Ejecutar proyecto en una temrinal
+python app.py
+
+- otra temrinal
+.\ngrok http 5000

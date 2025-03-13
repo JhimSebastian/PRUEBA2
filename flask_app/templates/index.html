@@ -83,13 +83,62 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
 
-        async function iniciarCamara() {
+        async function verificarPermisos() {
             try {
-                let stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                const permisos = await navigator.permissions.query({ name: "camera" });
+                console.log("📜 Estado de permisos:", permisos.state);
+
+                if (permisos.state === "denied") {
+                    alert("⚠️ No tienes permisos para usar la cámara. Actívalos en la configuración del navegador.");
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.warn("⚠️ No se pudo verificar permisos, intentando acceso directo...");
+                return true; 
+            }
+        }
+
+        async function iniciarCamara() {
+            if (!(await verificarPermisos())) return;
+
+            try {
+                console.log("🔍 Intentando acceder a la cámara trasera...");
+                let stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { exact: "environment" }, // Cámara trasera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+
+                console.log("✅ Cámara trasera activada correctamente.");
                 video.srcObject = stream;
                 video.onloadedmetadata = () => ajustarCanvas();
             } catch (error) {
-                console.error("Error accediendo a la cámara:", error);
+                console.error("🚨 Error accediendo a la cámara trasera:", error);
+
+                if (error.name === "OverconstrainedError" || error.name === "NotReadableError") {
+                    console.warn("🔄 Intentando con cámara frontal...");
+                    iniciarCamaraAlternativa();
+                } else {
+                    alert("⚠️ No se pudo acceder a la cámara. Revisa los permisos o prueba otro navegador.");
+                }
+            }
+        }
+
+        async function iniciarCamaraAlternativa() {
+            try {
+                let stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" } // Cámara frontal
+                });
+
+                console.log("✅ Cámara frontal activada.");
+                video.srcObject = stream;
+                video.onloadedmetadata = () => ajustarCanvas();
+            } catch (error) {
+                console.error("🚨 Ninguna cámara disponible:", error);
+                alert("⚠️ Ninguna cámara disponible. Verifica la configuración del navegador.");
             }
         }
 
@@ -102,7 +151,6 @@
             if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
             ajustarCanvas();
-
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = canvas.toDataURL('image/jpeg');
 
@@ -139,7 +187,7 @@
         }
 
         iniciarCamara();
-        setInterval(capturarYEnviar, 200);
+        setInterval(capturarYEnviar, 500);
     </script>
 </body>
 </html>
